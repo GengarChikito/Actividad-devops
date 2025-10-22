@@ -1,0 +1,27 @@
+name: Maven Build and Coverage Report
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      - name: Configurar JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Ejecutar Pruebas (mvn test) y Generar Reporte (mvn verify)
+        run: |
+          ./mvnw -B test
+          ./mvnw -B verify
