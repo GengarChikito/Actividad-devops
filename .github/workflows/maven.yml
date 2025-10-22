@@ -1,7 +1,10 @@
-# Archivo: .github/workflows/maven.yml
+name: Construccion de Maven y Reporte
 
-name: arreglo
-
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
 
 jobs:
   build:
@@ -10,7 +13,6 @@ jobs:
     steps:
       - name: Checkout del código
         uses: actions/checkout@v4
-
 
       - name: Dar permisos de ejecución al wrapper
         run: chmod +x mvnw
@@ -22,7 +24,7 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Ejecutar Pruebas (mvn test) y Generar Reporte (mvn verify)
+      - name: Pruebas Maven y Reporte
         run: |
           ./mvnw -B test
           ./mvnw -B verify
