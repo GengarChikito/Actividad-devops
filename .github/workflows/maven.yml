@@ -1,10 +1,7 @@
-name: Maven Build and Coverage Report
+# Archivo: .github/workflows/maven.yml
 
-on:
-  push:
-    branches: [ "main", "master" ]
-  pull_request:
-    branches: [ "main", "master" ]
+name: arreglo
+
 
 jobs:
   build:
@@ -13,6 +10,10 @@ jobs:
     steps:
       - name: Checkout del código
         uses: actions/checkout@v4
+
+
+      - name: Dar permisos de ejecución al wrapper
+        run: chmod +x mvnw
 
       - name: Configurar JDK 17
         uses: actions/setup-java@v4
