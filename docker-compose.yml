@@ -1,0 +1,14 @@
+version: '3.8'
+services:
+  app:
+    # Instruye a Docker Compose a construir la imagen usando el Dockerfile en el directorio actual
+    build: .
+    image: saludo-app:latest
+    container_name: saludo-app-container
+    ports:
+      # Expone el puerto 8080 del contenedor al puerto 8080 del host
+      - "8080:8080"
+    # Reinicia la aplicación si se detiene
+    restart: always
+
+# Nota: No se define un servicio 'db' aquí, ya que H2 es interna a la aplicación.
