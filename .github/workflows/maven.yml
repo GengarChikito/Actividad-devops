@@ -10,20 +10,19 @@ on:
       - main
       - master
 
+permissions:
+  contents: read
+  security-events: write   # 👈 Necesario para subir archivos SARIF
+  actions: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      # ==========================================================
-      # --- CHECKOUT DEL CÓDIGO ---
-      # ==========================================================
       - name: "Checkout del código"
         uses: actions/checkout@v4
 
-      # ==========================================================
-      # --- CONFIGURACIÓN DE MAVEN Y JDK ---
-      # ==========================================================
       - name: "Dar permisos de ejecución al wrapper"
         run: chmod +x mvnw
 
@@ -34,14 +33,11 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      # ==========================================================
-      # --- COMPILACIÓN Y PRUEBAS CON MAVEN ---
-      # ==========================================================
       - name: "Compilar y ejecutar pruebas Maven"
         run: ./mvnw -B clean verify
 
       # ==========================================================
-      # --- SNYK: ESCANEO DE DEPENDENCIAS Y CÓDIGO (SCA/SAST) ---
+      # --- SNYK SCA/SAST ---
       # ==========================================================
       - name: "Snyk: Escaneo de Dependencias y Código (SCA/SAST)"
         uses: snyk/actions/maven@v1
@@ -49,12 +45,20 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
+          command: test
           args: >
             --all-projects
-            --sarif-file-output=snyk-sca-sast.sarif
+            --json-file-output=snyk-sca-sast.json
+
+      # Convertir JSON de Snyk a SARIF para Code Scanning
+      - name: "Convertir reporte Snyk a SARIF"
+        if: always()
+        run: |
+          npm install -g snyk-to-sarif
+          snyk-to-sarif snyk-sca-sast.json > snyk-sca-sast.sarif
 
       # ==========================================================
-      # --- SNYK: ESCANEO DE IMAGEN DE CONTENEDOR ---
+      # --- ESCANEO DE CONTENEDOR ---
       # ==========================================================
       - name: "Construir y etiquetar la imagen Docker"
         run: docker build -t saludo-app:latest .
@@ -68,17 +72,13 @@ jobs:
           image: saludo-app:latest
           args: >
             --file=Dockerfile
-            --sarif-file-output=snyk-container.sarif
+            --json-file-output=snyk-container.json
+
+      - name: "Convertir reporte de contenedor a SARIF"
+        if: always()
+        run: |
+          snyk-to-sarif snyk-container.json > snyk-container.sarif
 
       # ==========================================================
-      # --- CARGA DE RESULTADOS A GITHUB CODE SCANNING ---
-      # ==========================================================
-      - name: "Cargar resultados SCA/SAST a Code Scanning"
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: snyk-sca-sast.sarif
-
-      - name: "Cargar resultados de Contenedor a Code Scanning"
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: snyk-container.sarif
+      # --- SUBIDA A CODE SCANNING ---
+      # ===================
