@@ -21,7 +21,11 @@ jobs:
       - name: "Dar permisos de ejecución al wrapper"
         run: chmod +x mvnw
 
+      # ==========================================================
+      # --- FIX: Configurar JDK 17 con ID para pasar JAVA_HOME a Snyk ---
+      # ==========================================================
       - name: "Configurar JDK 17"
+        id: setup-java # <--- AÑADIDO: ID para referenciar la ruta JAVA_HOME
         uses: actions/setup-java@v4
         with:
           java-version: '17'
@@ -33,12 +37,12 @@ jobs:
 
       # ==========================================================
       # --- SNYK: ESCANEO DE DEPENDENCIAS Y CÓDIGO (IE3: BLOQUEO) ---
-      # Eliminamos 'continue-on-error' para bloquear el pipeline si falla.
       # ==========================================================
       - name: "Snyk: Escaneo de Dependencias y Código (SCA/SAST)"
         uses: snyk/actions/maven@v1
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+          JAVA_HOME: ${{ steps.setup-java.outputs.java-home }} # <--- SOLUCIÓN: Pasar JAVA_HOME explícitamente
         with:
           args: >
             --all-projects
@@ -54,7 +58,6 @@ jobs:
 
       # ==========================================================
       # --- SNYK: ESCANEO DE IMAGEN DE CONTENEDOR (IE3: BLOQUEO) ---
-      # Eliminamos 'continue-on-error' para bloquear el pipeline si falla.
       # ==========================================================
       - name: "Snyk: Escaneo de Contenedor"
         uses: snyk/actions/docker@v1
@@ -79,7 +82,7 @@ jobs:
     # Solo ejecuta el despliegue si el job 'build-and-scan' fue exitoso y seguro
     needs: build-and-scan
 
-    # Se ejecuta solo si el push va a la rama principal (entorno de despliegue simulado)
+    # Se ejecuta solo si el push va a la rama principal
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
 
     steps:
@@ -87,14 +90,11 @@ jobs:
         uses: actions/checkout@v4
 
       - name: "Reconstruir imagen para despliegue"
-        # Necesitamos que la imagen exista en el runner del job 'deploy'
         run: docker build -t saludo-app:latest .
 
       - name: "Despliegue automático con Docker Compose"
         run: |
-          echo "Iniciando entorno simulado con Docker Compose (usando H2 in-memory)..."
-          # Baja cualquier contenedor existente e inicia el nuevo en background (-d)
-          # Esto cumple con el requisito de Despliegue Automático (IE4) y Orquestación (IE5)
+          echo "Iniciando entorno simulado con Docker Compose..."
           docker compose down --remove-orphans
           docker compose up -d
           echo "Despliegue finalizado."
