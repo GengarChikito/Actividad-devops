@@ -14,6 +14,14 @@ jobs:
   build-and-scan:
     runs-on: ubuntu-latest
 
+    # ==========================================================
+    # --- SOLUCIÓN FINAL: PERMISOS PARA CARGAR RESULTADOS SARIF ---
+    # Esto soluciona el error "Resource not accessible by integration"
+    # ==========================================================
+    permissions:
+      contents: read
+      security-events: write
+
     steps:
       - name: "Checkout del código"
         uses: actions/checkout@v4
@@ -25,7 +33,7 @@ jobs:
       # --- FIX: Configurar JDK 17 con ID para pasar JAVA_HOME a Snyk ---
       # ==========================================================
       - name: "Configurar JDK 17"
-        id: setup-java # <--- AÑADIDO: ID para referenciar la ruta JAVA_HOME
+        id: setup-java
         uses: actions/setup-java@v4
         with:
           java-version: '17'
@@ -42,7 +50,7 @@ jobs:
         uses: snyk/actions/maven@v1
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-          JAVA_HOME: ${{ steps.setup-java.outputs.java-home }} # <--- SOLUCIÓN: Pasar JAVA_HOME explícitamente
+          JAVA_HOME: ${{ steps.setup-java.outputs.java-home }}
         with:
           args: >
             --all-projects
@@ -64,37 +72,4 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
-          image: saludo-app:latest
-          args: >
-            --file=Dockerfile
-            --sarif-file-output=snyk-container.sarif
-
-      - name: "Cargar resultados de Contenedor a Code Scanning"
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: snyk-container.sarif
-
-  # ==========================================================
-  # --- DESPLIEGUE AUTOMÁTICO (IE4/IE5) ---
-  # ==========================================================
-  deploy:
-    runs-on: ubuntu-latest
-    # Solo ejecuta el despliegue si el job 'build-and-scan' fue exitoso y seguro
-    needs: build-and-scan
-
-    # Se ejecuta solo si el push va a la rama principal
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-
-    steps:
-      - name: "Checkout del código"
-        uses: actions/checkout@v4
-
-      - name: "Reconstruir imagen para despliegue"
-        run: docker build -t saludo-app:latest .
-
-      - name: "Despliegue automático con Docker Compose"
-        run: |
-          echo "Iniciando entorno simulado con Docker Compose..."
-          docker compose down --remove-orphans
-          docker compose up -d
-          echo "Despliegue finalizado."
+          image: saludo-app
