@@ -1,5 +1,4 @@
-FROM eclipse-temurin:17-jdk-jlink
-
+FROM eclipse-temurin:17-jdk-focal-slim
 WORKDIR /app
 COPY target/*.jar app.jar
 
