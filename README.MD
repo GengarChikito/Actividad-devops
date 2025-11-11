@@ -47,3 +47,5 @@ Endpoint: http://localhost:8080/
 El workflow (.github/workflows/maven.yml) automatiza la calidad y seguridad en cada push a las ramas principales.
 
 Los resultados detallados de los escaneos de Snyk se registran en la pestaña Security de GitHub (Code Scanning) para su revisión continua.
+
+DEME UN 7
