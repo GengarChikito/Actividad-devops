@@ -10,13 +10,8 @@ on:
       - main
       - master
 
-permissions:
-  contents: read
-  security-events: write   # 👈 Necesario para subir archivos SARIF
-  actions: read
-
 jobs:
-  build:
+  build-and-scan:
     runs-on: ubuntu-latest
 
     steps:
@@ -37,48 +32,69 @@ jobs:
         run: ./mvnw -B clean verify
 
       # ==========================================================
-      # --- SNYK SCA/SAST ---
+      # --- SNYK: ESCANEO DE DEPENDENCIAS Y CÓDIGO (IE3: BLOQUEO) ---
+      # Eliminamos 'continue-on-error' para bloquear el pipeline si falla.
       # ==========================================================
       - name: "Snyk: Escaneo de Dependencias y Código (SCA/SAST)"
         uses: snyk/actions/maven@v1
-        continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
-          command: test
           args: >
             --all-projects
-            --json-file-output=snyk-sca-sast.json
+            --sarif-file-output=snyk-sca-sast.sarif
 
-      # Convertir JSON de Snyk a SARIF para Code Scanning
-      - name: "Convertir reporte Snyk a SARIF"
-        if: always()
-        run: |
-          npm install -g snyk-to-sarif
-          snyk-to-sarif snyk-sca-sast.json > snyk-sca-sast.sarif
+      - name: "Cargar resultados SCA/SAST a Code Scanning"
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: snyk-sca-sast.sarif
 
-      # ==========================================================
-      # --- ESCANEO DE CONTENEDOR ---
-      # ==========================================================
-      - name: "Construir y etiquetar la imagen Docker"
+      - name: "Construir la imagen Docker"
         run: docker build -t saludo-app:latest .
 
+      # ==========================================================
+      # --- SNYK: ESCANEO DE IMAGEN DE CONTENEDOR (IE3: BLOQUEO) ---
+      # Eliminamos 'continue-on-error' para bloquear el pipeline si falla.
+      # ==========================================================
       - name: "Snyk: Escaneo de Contenedor"
         uses: snyk/actions/docker@v1
-        continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
           image: saludo-app:latest
           args: >
             --file=Dockerfile
-            --json-file-output=snyk-container.json
+            --sarif-file-output=snyk-container.sarif
 
-      - name: "Convertir reporte de contenedor a SARIF"
-        if: always()
+      - name: "Cargar resultados de Contenedor a Code Scanning"
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: snyk-container.sarif
+
+  # ==========================================================
+  # --- DESPLIEGUE AUTOMÁTICO (IE4/IE5) ---
+  # ==========================================================
+  deploy:
+    runs-on: ubuntu-latest
+    # Solo ejecuta el despliegue si el job 'build-and-scan' fue exitoso y seguro
+    needs: build-and-scan
+
+    # Se ejecuta solo si el push va a la rama principal (entorno de despliegue simulado)
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+
+    steps:
+      - name: "Checkout del código"
+        uses: actions/checkout@v4
+
+      - name: "Reconstruir imagen para despliegue"
+        # Necesitamos que la imagen exista en el runner del job 'deploy'
+        run: docker build -t saludo-app:latest .
+
+      - name: "Despliegue automático con Docker Compose"
         run: |
-          snyk-to-sarif snyk-container.json > snyk-container.sarif
-
-      # ==========================================================
-      # --- SUBIDA A CODE SCANNING ---
-      # ===================
+          echo "Iniciando entorno simulado con Docker Compose (usando H2 in-memory)..."
+          # Baja cualquier contenedor existente e inicia el nuevo en background (-d)
+          # Esto cumple con el requisito de Despliegue Automático (IE4) y Orquestación (IE5)
+          docker compose down --remove-orphans
+          docker compose up -d
+          echo "Despliegue finalizado."
