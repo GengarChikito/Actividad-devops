@@ -1,4 +1,5 @@
-FROM eclipse-temurin:17-jdk-focal-slim
+FROM eclipse-temurin:17-jdk-alpine
+
 WORKDIR /app
 COPY target/*.jar app.jar
 
